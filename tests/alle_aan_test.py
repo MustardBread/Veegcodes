@@ -10,16 +10,20 @@ pins = [7, 15, 33]
 for pin in pins:
     GPIO.setup(pin, GPIO.OUT, initial=GPIO.LOW)
 
-print ("Alle relais AAN")
-for pin in pins:
-	GPIO.output(pin, GPIO.HIGH)
-	
-time.sleep(4)
+try:
+    print("Alle relais AAN")
+    for pin in pins:
+        GPIO.output(pin, GPIO.HIGH)
+    
+    time.sleep(4)
 
-print ("Alle relais UIT")
-for pin in pins:
-	GPIO.output(pin, GPIO.LOW)
+except KeyboardInterrupt:
+    print("Alle relais UIT")
+    for pin in pins:
+        GPIO.output(pin, GPIO.LOW)
 
+    print("Programma afgebroken door gebruiker.")
 
-GPIO.cleanup()
-print("GPIO opgeschoond.")
+finally:
+    GPIO.cleanup()
+    print("GPIO opgeschoond.")

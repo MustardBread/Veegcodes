@@ -12,15 +12,18 @@ for pin in pins:
 
 try:
     while True:
-        # Zet elke pin één voor één aan en uit
+        # Zet elke pin één voor één aan
         for pin in pins:
             print(f"Pin {pin} AAN")
             GPIO.output(pin, GPIO.HIGH)
-            time.sleep(1)  # Even wachten zodat de pin aan blijft
+            time.sleep(1)
 
-            print(f"Pin {pin} UIT")
+        # Zet alle pinnen tegelijkertijd uit
+        print("Alle pinnen UIT")
+        for pin in pins:
             GPIO.output(pin, GPIO.LOW)
-            time.sleep(1)  # Even wachten zodat de pin uit is
+
+        time.sleep(1)
 
 except KeyboardInterrupt:
     print("\nGestopt door gebruiker.")
