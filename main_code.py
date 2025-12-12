@@ -5,7 +5,7 @@ import sys
 # Jouw bestanden importeren
 import relay_code
 import can_controller
-import arduino_MCP4725   # jouw serial bestand
+import arduino_MCP4725 
 
 # Variabelen
 reverse = False
@@ -20,13 +20,16 @@ current_speed = 0  # 0 t/m 100
 def shutdown_all():
     print("\n--- Shutting down system ---")
 
+    can_controller.send_value(0)
+    time.sleep(0.2)
+
     # Relays uit
     relay_code.relay_off("K1")
     relay_code.relay_off("K2")
     relay_code.relay_off("K3")
 
     # CAN interface stoppen
-    can_controller.stop_can_interface()
+    can_controller.cleanup()
 
     # Arduino serial sluiten
     arduino_MCP4725.close_serial()
@@ -52,12 +55,12 @@ def apply_speed():
 
 
 def apply_reverse():
-    """Reverse → bedient relais K2."""
+    """Reverse → bedient relais K1."""
     if reverse:
-        relay_code.relay_on("K2")
+        relay_code.relay_on("K1")
         arduino_MCP4725.send_speed(0)
     else:
-        relay_code.relay_off("K2")
+        relay_code.relay_off("K1")
         arduino_MCP4725.send_speed(0)
 
 
@@ -70,9 +73,9 @@ def apply_borstels():
 
 
 def apply_system_on():
-    """System ON → K1 aan + reverse/borstels toepassen."""
+    """System ON → K2 aan + reverse/borstels toepassen."""
     if system_on:
-        relay_code.relay_on("K1")
+        relay_code.relay_on("K2")
         apply_reverse()
         apply_borstels()
     else:
@@ -91,7 +94,7 @@ def main():
     print("Press Ctrl+C to stop.\n")
 
     # CAN interface aanzetten
-    can_controller.start_can_interface()
+    can_controller.init()
 
     # Arduino serial openen (direct opstarten)
     arduino_MCP4725.initialize_serial()
@@ -104,7 +107,7 @@ def main():
     system_on = False
 
     while True:
-        cmd = input("Command (speed / left / right / on / off / reverse / borstels): ").strip().lower()
+        cmd = input("Command (speed / left / right / straight / on / off / reverse / borstels): ").strip().lower()
 
         # ---------------- SPEED ----------------
         if cmd.isdigit():
@@ -117,13 +120,18 @@ def main():
 
         # ------------- POSITION RIGHT ----------
         elif cmd == "right":
-            can_controller.send_value(+3000)
+            can_controller.send_value(-8500)
             print("Turning RIGHT")
 
         # ------------- POSITION LEFT -----------
         elif cmd == "left":
-            can_controller.send_value(-3000)
+            can_controller.send_value(9600)
             print("Turning LEFT")
+
+        # ------------- POSITION STRAIGHT -----------
+        elif cmd == "straight":
+            can_controller.send_value(0)
+            print("Turning STRAIGHT")
 
         # ------------- SYSTEM ON/OFF -----------
         elif cmd == "on":
