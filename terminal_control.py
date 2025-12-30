@@ -117,17 +117,17 @@ def main():
                 print("Speed must be 0–100.")
 
         # ------------- POSITION RIGHT ----------
-        elif cmd == "right":
-            can_controller.send_value(-8500)
+        elif cmd == "d":
+            can_controller.send_value(-9000)
             print("Turning RIGHT")
 
         # ------------- POSITION LEFT -----------
-        elif cmd == "left":
-            can_controller.send_value(9600)
+        elif cmd == "a":
+            can_controller.send_value(9000)
             print("Turning LEFT")
 
         # ------------- POSITION STRAIGHT -----------
-        elif cmd == "straight":
+        elif cmd == "w":
             can_controller.send_value(0)
             print("Turning STRAIGHT")
 

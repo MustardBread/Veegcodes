@@ -4,27 +4,25 @@ import cv2
 import threading
 
 # ======================
-# CONFIGURATIE
-# ======================
-SIDE_DISTANCE = 1000          # mm → 2 meter
-SIDE_RATIO_THRESHOLD = 0.03   # 3% pixels te dichtbij
-
-TOP_IGNORE_RATIO = 0.05
-BOTTOM_IGNORE_RATIO = 0.10
-
-# ======================
 # GLOBAL STATE
 # ======================
 obstacle_left = False
 obstacle_right = False
+
+left_distance = 0.0     # mm
+right_distance = 0.0    # mm
+
 _running = True
+_config = None
 
 
 # ======================
 # CAMERA THREAD
 # ======================
 def _camera_loop():
-    global obstacle_left, obstacle_right, _running
+    global obstacle_left, obstacle_right
+    global left_distance, right_distance
+    global _running, _config
 
     pipeline = dai.Pipeline()
 
@@ -59,54 +57,69 @@ def _camera_loop():
             height, width = depthFrame.shape
             mid = width // 2
 
-            roi_top = int(TOP_IGNORE_RATIO * height)
-            roi_bottom = int((1.0 - BOTTOM_IGNORE_RATIO) * height)
+            roi_top = int(_config["TOP_IGNORE_RATIO"] * height)
+            roi_bottom = int((1.0 - _config["BOTTOM_IGNORE_RATIO"]) * height)
 
             roi = depthFrame[roi_top:roi_bottom, :]
 
             # ===== LINKS =====
             left_roi = roi[:, :mid]
-            valid_left = left_roi > 0
-            too_close_left = (left_roi < SIDE_DISTANCE) & valid_left
+            valid_left = left_roi[left_roi > 0]
 
+            if valid_left.size > 50:
+                left_distance = float(np.percentile(valid_left, 20))
+            else:
+                left_distance = 0.0
+
+            too_close_left = valid_left < _config["SIDE_DISTANCE"]
             left_ratio = (
-                np.count_nonzero(too_close_left) /
-                np.count_nonzero(valid_left)
-                if np.count_nonzero(valid_left) > 0 else 0.0
+                np.count_nonzero(too_close_left) / valid_left.size
+                if valid_left.size > 0 else 0.0
             )
 
             # ===== RECHTS =====
             right_roi = roi[:, mid:]
-            valid_right = right_roi > 0
-            too_close_right = (right_roi < SIDE_DISTANCE) & valid_right
+            valid_right = right_roi[right_roi > 0]
 
+            if valid_right.size > 50:
+                right_distance = float(np.percentile(valid_right, 20))
+            else:
+                right_distance = 0.0
+
+            too_close_right = valid_right < _config["SIDE_DISTANCE"]
             right_ratio = (
-                np.count_nonzero(too_close_right) /
-                np.count_nonzero(valid_right)
-                if np.count_nonzero(valid_right) > 0 else 0.0
+                np.count_nonzero(too_close_right) / valid_right.size
+                if valid_right.size > 0 else 0.0
             )
 
-            obstacle_left = left_ratio >= SIDE_RATIO_THRESHOLD
-            obstacle_right = right_ratio >= SIDE_RATIO_THRESHOLD
+            obstacle_left = left_ratio >= _config["SIDE_RATIO_THRESHOLD"]
+            obstacle_right = right_ratio >= _config["SIDE_RATIO_THRESHOLD"]
 
-            # ===== VISUALISATIE (OPTIONEEL) =====
-            depth_vis = cv2.normalize(depthFrame, None, 0, 255, cv2.NORM_MINMAX)
-            depth_vis = np.uint8(depth_vis)
-            depth_color = cv2.cvtColor(depth_vis, cv2.COLOR_GRAY2BGR)
+            # ===== VISUALISATIE =====
+            if _config["SHOW_DEBUG"]:
+                depth_vis = cv2.normalize(depthFrame, None, 0, 255, cv2.NORM_MINMAX)
+                depth_vis = np.uint8(depth_vis)
+                depth_color = cv2.cvtColor(depth_vis, cv2.COLOR_GRAY2BGR)
 
-            if obstacle_left:
-                cv2.putText(depth_color, "LEFT OBSTACLE", (40, 80),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
+                cv2.putText(depth_color, f"L: {int(left_distance)} mm", (40, 50),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 0), 2)
 
-            if obstacle_right:
-                cv2.putText(depth_color, "RIGHT OBSTACLE", (40, 130),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
+                cv2.putText(depth_color, f"R: {int(right_distance)} mm", (40, 90),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 0), 2)
 
-            cv2.imshow("OAK-D Side Avoidance", depth_color)
+                if obstacle_left:
+                    cv2.putText(depth_color, "LEFT OBSTACLE", (40, 140),
+                                cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
 
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                _running = False
-                break
+                if obstacle_right:
+                    cv2.putText(depth_color, "RIGHT OBSTACLE", (40, 190),
+                                cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
+
+                cv2.imshow("OAK-D Side Avoidance", depth_color)
+
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    _running = False
+                    break
 
         cv2.destroyAllWindows()
 
@@ -114,7 +127,9 @@ def _camera_loop():
 # ======================
 # PUBLIEKE API
 # ======================
-def start_camera_thread():
+def start_camera_thread(config: dict):
+    global _config
+    _config = config
     thread = threading.Thread(target=_camera_loop, daemon=True)
     thread.start()
 
